@@ -31,7 +31,7 @@ export default function Index() {
 }
 `;
 
-const layoutContent = `import { Stack } from "expo-router";
+const layoutContent = import { Stack } from "expo-router";
 
 export default function RootLayout() {
   return (
@@ -40,7 +40,7 @@ export default function RootLayout() {
     </Stack>
   );
 }
-`;
+;
 
 fs.rename(oldDirPath, newDirPath, (error) => {
   if (error) {
