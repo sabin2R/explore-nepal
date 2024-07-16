@@ -1,57 +1,30 @@
-import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
-import { RouteProp } from '@react-navigation/native';
+// import React from 'react';
+// import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+// import HomeScreen from '../app/(tabs)/home';
+// import DestinationsScreen from '../app/(tabs)/destinations';
+// import { Ionicons } from '@expo/vector-icons';
 
-import HomeScreen from '../app/index';
-// import DestinationsScreen from '../screens/DestinationsScreen';
-// import MapScreen from '../screens/MapScreen';
-// import ItineraryScreen from '../screens/ItineraryScreen';
-// import ProfileScreen from '../screens/ProfileScreen';
+// const Tab = createBottomTabNavigator();
 
-type TabBarIconProps = {
-    color: string;
-    size: number;
-};
+// const BottomTabNavigator = () => {
+//   return (
+//     <Tab.Navigator>
+//       <Tab.Screen 
+//         name="Home" 
+//         component={HomeScreen} 
+//         options={{
+//           tabBarIcon: ({ color, size }) => <Ionicons name="home" color={color} size={size} />,
+//         }} 
+//       />
+//       <Tab.Screen 
+//         name="Destinations" 
+//         component={DestinationsScreen} 
+//         options={{
+//           tabBarIcon: ({ color, size }) => <Ionicons name="map" color={color} size={size} />,
+//         }} 
+//       />
+//     </Tab.Navigator>
+//   );
+// };
 
-const Tab = createBottomTabNavigator();
-
-const getIconName = (routeName: string): keyof typeof Ionicons.glyphMap => {
-    switch (routeName) {
-        case 'Home':
-            return 'home';
-        case 'Destinations':
-            return 'list';
-        case 'Map':
-            return 'map';
-        case 'Itinerary':
-            return 'calendar';
-        case 'Profile':
-            return 'person';
-        default:
-            return 'home';
-    }
-};
-
-const BottomTabNavigator: React.FC = () => {
-    return (
-        <Tab.Navigator
-            screenOptions={({ route }) => ({
-                tabBarIcon: ({ color, size }: TabBarIconProps) => {
-                    const iconName = getIconName(route.name);
-                    return <Ionicons name={iconName} size={size} color={color} />;
-                },
-                tabBarActiveTintColor: 'tomato',
-                tabBarInactiveTintColor: 'gray',
-            })}
-        >
-            <Tab.Screen name="Home" component={HomeScreen} />
-            {/* <Tab.Screen name="Destinations" component={DestinationsScreen} />
-      <Tab.Screen name="Map" component={MapScreen} />
-      <Tab.Screen name="Itinerary" component={ItineraryScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} /> */}
-        </Tab.Navigator>
-    );
-}
-
-export default BottomTabNavigator;
+// export default BottomTabNavigator;
