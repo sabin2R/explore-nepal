@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import firebase from '../../config/firebaseConfig';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -21,92 +22,113 @@ const LoginScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Explore Nepal</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="E-mail"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <View style={styles.passwordContainer}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Expl
+          <Ionicons name="location-outline" size={25} color="#000" />
+          re Nepal</Text>
+      </View>
+      <View style={styles.form}>
         <TextInput
           style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!passwordVisible}
+          placeholder="E-mail"
+          placeholderTextColor="#888"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
           autoCapitalize="none"
         />
-        <TouchableOpacity
-          style={styles.eyeIcon}
-          onPress={() => setPasswordVisible(!passwordVisible)}
-        >
-          <Ionicons name={passwordVisible ? 'eye' : 'eye-off'} size={24} color="black" />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#888"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!passwordVisible}
+            autoCapitalize="none"
+          />
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={() => setPasswordVisible(!passwordVisible)}
+          >
+            <Ionicons name={passwordVisible ? 'eye' : 'eye-off'} size={24} color="black" />
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity>
+          <Text style={styles.forgotPassword}>Forgot password?</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+          <Text style={styles.loginButtonText}>Login</Text>
         </TouchableOpacity>
       </View>
-      <TouchableOpacity>
-        <Text style={styles.forgotPassword}>Forgot password?</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-        <Text style={styles.loginButtonText}>Login</Text>
-      </TouchableOpacity>
       <View style={styles.registerContainer}>
-        <Text>New to Explore Nepal? </Text>
+        <Text style={styles.text}>New to Explore Nepal? </Text>
         <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
           <Text style={styles.registerText}>Register</Text>
         </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.socialButton}>
-        <Ionicons name="logo-apple" size={24} color="black" />
-        <Text style={styles.socialButtonText}>Login with Apple</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.socialButton}>
-        <Ionicons name="logo-google" size={24} color="black" />
-        <Text style={styles.socialButtonText}>Login with Google</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.socialLoginContainer}>
+        <TouchableOpacity style={styles.socialButton}>
+          <Ionicons name="logo-apple" size={24} color="black" />
+          <Text style={styles.socialButtonText}>Login with Apple</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.socialButton}>
+          <Ionicons name="logo-google" size={24} color="black" />
+          <Text style={styles.socialButtonText}>Login with Google</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
     paddingHorizontal: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
+    color: '#333',
     textAlign: 'center',
-    marginBottom: 20,
+  },
+  form: {
+    flex: 2,
+    justifyContent: 'center',
   },
   input: {
     height: 50,
-    borderColor: '#ccc',
+    width: 400,
+    borderColor: '#ddd',
     borderWidth: 1,
     borderRadius: 10,
-    paddingHorizontal: 10,
-    marginBottom: 10,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    backgroundColor: '#fff',
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
   eyeIcon: {
     position: 'absolute',
-    right: 10,
+    right: 15,
   },
   forgotPassword: {
     textAlign: 'right',
     marginBottom: 20,
-    color: 'blue',
+    color: '#007AFF',
+    fontWeight: '500',
   },
   loginButton: {
-    backgroundColor: 'black',
+    backgroundColor: '#000',
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',
@@ -115,28 +137,40 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: 'white',
     fontSize: 18,
+    fontWeight: 'bold',
   },
   registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: 20,
   },
+  text: {
+    color: '#666',
+  },
   registerText: {
-    color: 'blue',
+    color: '#007AFF',
+    fontWeight: 'bold',
+  },
+  socialLoginContainer: {
+    marginBottom: Platform.OS === 'ios' ? 50 : 20,
   },
   socialButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: '#ccc',
+    borderColor: '#ddd',
     borderWidth: 1,
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 15,
     paddingHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: 15,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
   },
   socialButtonText: {
     marginLeft: 10,
     fontSize: 18,
+    color: '#333',
+    fontWeight: '500',
   },
 });
 

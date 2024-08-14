@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,8 +8,18 @@ import { router } from 'expo-router';
 const { width } = Dimensions.get('window');
 
 const ProfileScreen: React.FC = () => {
-  const userName = auth.currentUser?.displayName || "User"; // Replace with dynamic user data
-  const userEmail = auth.currentUser?.email || "user@example.com"; // Replace with dynamic user data
+  const [userName, setUserName] = useState<string>('');
+
+  useEffect(() => {
+    // Fetch user data from Firebase Authentication
+    const user = auth.currentUser;
+    if (user) {
+      // If displayName is not set, fallback to part of the email as a default name
+      setUserName(user.displayName || user.email?.split('@')[0] || 'User');
+    }
+  }, []);
+
+  const userEmail = auth.currentUser?.email || 'user@example.com';
 
   const handleLogout = async () => {
     try {
@@ -24,7 +34,11 @@ const ProfileScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.profileContainer}>
-        <Image source={{ uri: auth.currentUser?.photoURL || 'https://placekitten.com/200/200' }} style={styles.profileImage} />
+        <Image
+          source={{ uri: auth.currentUser?.photoURL || 'https://placekitten.com/200/200' }}
+          style={styles.profileImage}
+        />
+        <Ionicons name="person-circle-outline" size={50} color="black" style={styles.userIcon} />
         <Text style={styles.userName}>{userName}</Text>
         <Text style={styles.userEmail}>{userEmail}</Text>
       </View>
@@ -33,7 +47,7 @@ const ProfileScreen: React.FC = () => {
           <Ionicons name="notifications-outline" size={24} color="black" />
           <Text style={styles.settingText}>Notifications</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity style={styles.settingItem} onPress={() => router.push('/preferences')}>
           <Ionicons name="settings-outline" size={24} color="black" />
           <Text style={styles.settingText}>Preferences</Text>
         </TouchableOpacity>
@@ -50,6 +64,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+    backgroundColor: '#f5f5f5', // Better background for contrast on both iOS and Android
   },
   profileContainer: {
     justifyContent: 'center',
@@ -60,7 +75,10 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: 20,
+    marginBottom: 10, // Adjusted for spacing
+  },
+  userIcon: {
+    marginBottom: 10, // Adjust for spacing between icon and name
   },
   userName: {
     fontSize: width > 600 ? 24 : 20, 

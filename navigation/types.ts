@@ -20,5 +20,21 @@ export type Destination = {
   category: string;
   location: Location;
   tips?: string;
-  wayToReach?: string;
-};
+  howToReach?: string;
+}
+
+
+export interface Activity{
+  time: string;
+  description: string;
+}
+
+export interface Itinerary {
+  id?: string;
+  destinationId: string; // Reference to a destination
+  startDate: string; // ISO string format
+  endDate: string; // ISO string format
+  destination?: Destination; 
+  activities: Activity[];
+}
+
