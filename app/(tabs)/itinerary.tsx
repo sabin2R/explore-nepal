@@ -1,54 +1,152 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Image,
+  Dimensions,
+  Alert,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { firestore } from '../../config/firebaseConfig';
+import { Itinerary, Destination } from '../../navigation/types';
 
 const { width } = Dimensions.get('window');
 
 const ItineraryScreen: React.FC = () => {
-  const [itinerary, setItinerary] = useState<string[]>([]);
-  const [newItem, setNewItem] = useState('');
+  const [itineraries, setItineraries] = useState<Itinerary[]>([]);
+  const [destinations, setDestinations] = useState<Record<string, Destination>>(
+    {}
+  );
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  const addItem = () => {
-    if (newItem.trim() === '') {
-      Alert.alert('Error', 'Please enter an activity or destination.');
-      return;
-    }
-    setItinerary([...itinerary, newItem]);
-    setNewItem('');
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      try {
+        const snapshot = await firestore.collection('destinations').get();
+        const data = snapshot.docs.reduce((acc, doc) => {
+          acc[doc.id] = doc.data() as Destination;
+          return acc;
+        }, {} as Record<string, Destination>);
+        setDestinations(data);
+      } catch (error) {
+        console.error('Error fetching destinations:', error);
+      }
+    };
+
+    const fetchItineraries = async () => {
+      try {
+        const snapshot = await firestore.collection('itineraries').get();
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Itinerary[];
+        setItineraries(data);
+      } catch (error) {
+        console.error('Error fetching itineraries:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDestinations();
+    fetchItineraries();
+  }, []);
+
+  const handleDeleteItinerary = async (id: string) => {
+    Alert.alert(
+      'Delete Itinerary',
+      'Are you sure you want to delete this itinerary?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await firestore.collection('itineraries').doc(id).delete();
+              setItineraries(itineraries.filter((itinerary) => itinerary.id !== id));
+              Alert.alert('Itinerary deleted successfully!');
+            } catch (error) {
+              console.error('Error deleting itinerary:', error);
+              Alert.alert('Error deleting itinerary:', error.message);
+            }
+          },
+        },
+      ]
+    );
   };
 
-  const removeItem = (index: number) => {
-    setItinerary(itinerary.filter((_, i) => i !== index));
+  const renderItem = ({ item }: { item: Itinerary }) => {
+    const destination = destinations[item.destinationId];
+
+    return (
+      <TouchableOpacity
+        style={styles.itineraryCard}
+        onPress={() => router.push(`/itineraryDetail/${item.id || 'default-id'}`)}
+      >
+        {destination && (
+          <View style={styles.cardContent}>
+            <Image
+              source={{ uri: destination.imageUrl }}
+              style={styles.destinationImage}
+            />
+            <View style={styles.textContainer}>
+              <Text style={styles.itineraryName}>{destination.name}</Text>
+              <Text style={styles.itineraryDates}>
+                {new Date(item.startDate).toDateString()} -{' '}
+                {new Date(item.endDate).toDateString()}
+              </Text>
+              <Text style={styles.itineraryCategory}>{destination.category}</Text>
+            </View>
+          </View>
+        )}
+        <View style={styles.iconContainer}>
+          <TouchableOpacity
+            style={styles.editIcon}
+            onPress={() => router.push(`/editItinerary/${item.id || 'default-id'}`)}
+          >
+            <Ionicons name="pencil" size={20} color="#007AFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteIcon}
+            onPress={() => handleDeleteItinerary(item.id || 'default-id')}
+          >
+            <Ionicons name="trash" size={20} color="#FF3B30" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const handleAddItinerary = () => {
+    router.push('/addItinerary'); // Navigate to the add itinerary screen
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>My Itinerary</Text>
-      <FlatList
-        data={itinerary}
-        renderItem={({ item, index }) => (
-          <View style={styles.itineraryItem}>
-            <Text style={styles.itemText}>{item}</Text>
-            <TouchableOpacity onPress={() => removeItem(index)}>
-              <Ionicons name="trash" size={24} color="red" />
-            </TouchableOpacity>
-          </View>
-        )}
-        keyExtractor={(item, index) => index.toString()}
-        contentContainerStyle={styles.list}
-      />
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Add new activity or destination"
-          value={newItem}
-          onChangeText={setNewItem}
+      {loading ? (
+        <ActivityIndicator size="large" color="#0000ff" />
+      ) : (
+        <FlatList
+          data={itineraries}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id || 'default-key'}
+          contentContainerStyle={styles.listContainer}
         />
-        <TouchableOpacity onPress={addItem} style={styles.addButton}>
-          <Ionicons name="add-circle" size={40} color="green" />
-        </TouchableOpacity>
-      </View>
+      )}
+      <TouchableOpacity style={styles.addButton} onPress={handleAddItinerary}>
+        <Ionicons name="add" size={24} color="white" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -56,49 +154,74 @@ const ItineraryScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: '#f9f9f9',
   },
-  title: {
-    fontSize: width > 600 ? 30 : 24, // Adjust font size based on screen width
-    fontWeight: 'bold',
-    marginBottom: 20,
+  listContainer: {
+    paddingHorizontal: 10,
+    paddingBottom: 80, // Leave space for the floating button
   },
-  list: {
-    flexGrow: 1,
-    marginBottom: 20,
-  },
-  itineraryItem: {
+  itineraryCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
-    borderRadius: 10,
     backgroundColor: '#fff',
-    marginBottom: 10,
+    padding: 10,
+    marginVertical: 8,
+    borderRadius: 8,
     elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
-  itemText: {
-    fontSize: 18,
-  },
-  inputContainer: {
+  cardContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  input: {
     flex: 1,
-    height: 50,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
+  },
+  destinationImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 5,
     marginRight: 10,
   },
+  textContainer: {
+    flex: 1,
+  },
+  itineraryName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  itineraryDates: {
+    fontSize: 14,
+    color: '#555',
+  },
+  itineraryCategory: {
+    fontSize: 12,
+    color: '#888',
+  },
+  iconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editIcon: {
+    padding: 5,
+  },
+  deleteIcon: {
+    padding: 5,
+  },
   addButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 30,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
   },

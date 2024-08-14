@@ -1,5 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ImageBackground, FlatList, Pressable, ActivityIndicator, Dimensions, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  ImageBackground,
+  FlatList,
+  Pressable,
+  ActivityIndicator,
+  Dimensions,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { firestore } from '../../config/firebaseConfig';
@@ -7,13 +18,18 @@ import CategoryIcon from '../../components/CategoryIcon';
 import globalStyles from '../../styles/globalStyles';
 import { Destination } from '../../navigation/types';
 import firebase from 'firebase/compat/app';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const {width} = Dimensions.get('window')
+const { width } = Dimensions.get('window');
 
 const HomeScreen: React.FC = () => {
   const [userName, setUserName] = useState('');
-  const [destinations, setDestinations] = useState<Destination[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allDestinations, setAllDestinations] = useState<Destination[]>([]);
+  const [initialDestinations, setInitialDestinations] = useState<Destination[]>([]);
+  const [filteredDestinations, setFilteredDestinations] = useState<Destination[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -30,25 +46,62 @@ const HomeScreen: React.FC = () => {
         console.error('Error fetching user name:', error);
       }
     };
-    
-    const fetchDestinations = async () => {
+
+    const fetchInitialDestinations = async () => {
       try {
+        setLoading(true);
         const snapshot = await firestore.collection('destinations').get();
-        const data = snapshot.docs.map(doc => ({
+        const data = snapshot.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
         })) as Destination[];
+        
         const shuffled = data.sort(() => 0.5 - Math.random());
-        setDestinations(shuffled.slice(0, 5));
+        const selectedDestinations = shuffled.slice(0, 5);
+        setAllDestinations(data);  // Store all destinations
+        setInitialDestinations(selectedDestinations); // Store only the 5 randomly selected ones
+        setFilteredDestinations(selectedDestinations); // Initially show the 5 selected destinations
       } catch (error) {
         console.error('Error fetching destinations:', error);
       } finally {
         setLoading(false);
       }
     };
+
     fetchUserName();
-    fetchDestinations();
+    fetchInitialDestinations();
   }, []);
+
+  const fetchFilteredDestinations = (query: string, category: string | null) => {
+    let results = allDestinations;
+
+    if (category) {
+      results = results.filter((destination) => destination.category.toLowerCase() === category.toLowerCase());
+    }
+
+    if (query) {
+      results = results.filter((destination) =>
+        destination.name.toLowerCase().includes(query.toLowerCase())
+      );
+    }
+
+    setFilteredDestinations(results);
+  };
+
+  const handleCategoryPress = (category: string) => {
+    if (selectedCategory === category) {
+      setSelectedCategory(null); // Deselect category
+      setFilteredDestinations(initialDestinations); // Show the initial 5 destinations
+    } else {
+      setSelectedCategory(category); // Select new category
+      fetchFilteredDestinations(searchQuery, category);
+    }
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    fetchFilteredDestinations(query, selectedCategory);
+  };
 
   const renderItem = ({ item }: { item: Destination }) => (
     <Pressable onPress={() => router.push(`/destinationDetail?destination=${encodeURIComponent(JSON.stringify(item))}`)}>
@@ -56,7 +109,6 @@ const HomeScreen: React.FC = () => {
         <ImageBackground source={{ uri: item.imageUrl }} style={styles.destinationImage} />
         <View style={styles.destinationTextContainer}>
           <Text style={styles.destinationName}>{item.name}</Text>
-          {/* <Text style={styles.destinationDescription}>{item.description.substring(0, 50)}...</Text> */}
           <Ionicons name="chevron-forward" size={16} color="black" style={styles.chevronIcon} />
         </View>
       </View>
@@ -72,39 +124,60 @@ const HomeScreen: React.FC = () => {
       <TextInput
         style={styles.searchBar}
         placeholder="Search your destination"
+        placeholderTextColor={Platform.OS === 'ios' ? '#8e8e93' : undefined} // Adjust placeholder color for iOS
+        value={searchQuery}
+        onChangeText={handleSearch}
       />
       <Text style={styles.sectionTitle}>Categories</Text>
       <View style={styles.categoriesContainer}>
-        <View style={styles.categoryCard}>
+        <Pressable
+          style={[
+            styles.categoryCard,
+            selectedCategory === 'Historical' && styles.selectedCategoryCard,
+          ]}
+          onPress={() => handleCategoryPress('Historical')}
+        >
           <CategoryIcon icon={require('../../assets/icons/Historical.png')} label="Historical" />
-        </View>
-        <View style={styles.categoryCard}>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.categoryCard,
+            selectedCategory === 'Adventure' && styles.selectedCategoryCard,
+          ]}
+          onPress={() => handleCategoryPress('Adventure')}
+        >
           <CategoryIcon icon={require('../../assets/icons/Adventure.png')} label="Adventure" />
-        </View>
-        <View style={styles.categoryCard}>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.categoryCard,
+            selectedCategory === 'Nature' && styles.selectedCategoryCard,
+          ]}
+          onPress={() => handleCategoryPress('Nature')}
+        >
           <CategoryIcon icon={require('../../assets/icons/Nature.png')} label="Nature" />
-        </View>
+        </Pressable>
       </View>
       <Text style={styles.sectionTitle}>Featured Destination</Text>
     </>
   );
 
   return (
-    <View style={globalStyles.container}>
+    <SafeAreaView style={globalStyles.container}>
       {loading ? (
         <ActivityIndicator size="large" color="#0000ff" />
       ) : (
         <FlatList
-          data={destinations}
-          numColumns={width > 600? 3:2}
+          data={filteredDestinations}
+          numColumns={width > 600 ? 3 : 2}
           renderItem={renderItem}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           ListHeaderComponent={ListHeaderComponent}
           contentContainerStyle={styles.featuredScrollContainer}
           columnWrapperStyle={width > 600 ? styles.columnWrapper : null}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -116,14 +189,13 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   greeting: {
-    fontSize: width > 600? 30:24,
+    fontSize: width > 600 ? 30 : 24,
     fontWeight: 'bold',
   },
   notificationIcon: {
     marginRight: 10,
   },
   searchBar: {
-    // fontSize:10,
     marginHorizontal: 20,
     padding: 10,
     backgroundColor: '#eee',
@@ -145,16 +217,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
     shadowRadius: 2,
-    // width: width / 3.5,
     alignItems: 'center',
   },
-  section: {
-    padding: 20,
+  selectedCategoryCard: {
+    borderColor: '#007AFF',
+    borderWidth: 2,
   },
   sectionTitle: {
-    fontSize: width > 600 ? 22: 18,
+    fontSize: width > 600 ? 22 : 18,
     fontWeight: 'bold',
     marginBottom: 10,
+    paddingHorizontal: 20,
   },
   destinationCard: {
     flex: 1,
@@ -167,12 +240,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
     shadowRadius: 2,
-    width:width > 600? 250:200 ,
+    width: width > 600 ? 250 : 200,
     alignItems: 'center',
   },
   destinationImage: {
     width: '100%',
-    height: width > 600? 200:150,
+    height: width > 600 ? 200 : 150,
   },
   destinationTextContainer: {
     padding: 10,
@@ -184,11 +257,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     flex: 1,
-  },
-  destinationDescription: {
-    fontSize: 12,
-    color: '#666',
-    flex: 2,
   },
   chevronIcon: {
     marginLeft: 10,

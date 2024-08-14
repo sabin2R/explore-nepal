@@ -3,24 +3,25 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import firebase from '../../config/firebaseConfig';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SignUpScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword]= useState ('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const router = useRouter();
 
   const handleSignUp = async () => {
     if (password !== confirmPassword) {
-      Alert.alert ('Error', 'Passwords do not match!')
+      Alert.alert('Error', 'Passwords do not match!');
       return;
     }
     try {
       const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
       const user = userCredential.user;
-      
+
       if (user) {
         await firebase.firestore().collection('users').doc(user.uid).set({
           name,
@@ -35,83 +36,115 @@ const SignUpScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Explore Nepal</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Name"
-        value={name}
-        onChangeText={setName}
-        autoCapitalize="words"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="E-mail"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <View style={styles.passwordContainer}>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>
+          Expl
+          <Ionicons name="location-outline" size={25} color="#000" />
+          re Nepal
+        </Text>
+      </View>
+      <View style={styles.form}>
         <TextInput
           style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
+          placeholder="Name"
+          placeholderTextColor="#888"
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="E-mail"
+          placeholderTextColor="#888"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#888"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!passwordVisible}
+            autoCapitalize="none"
+          />
+          <TouchableOpacity
+            style={styles.eyeIcon}
+            onPress={() => setPasswordVisible(!passwordVisible)}
+          >
+            <Ionicons name={passwordVisible ? 'eye' : 'eye-off'} size={24} color="black" />
+          </TouchableOpacity>
+        </View>
+        <TextInput
+          style={styles.input}
+          placeholder="Confirm Password"
+          placeholderTextColor="#888"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
           secureTextEntry={!passwordVisible}
           autoCapitalize="none"
         />
-        <TouchableOpacity
-          style={styles.eyeIcon}
-          onPress={() => setPasswordVisible(!passwordVisible)}
-        >
-          <Ionicons name={passwordVisible ? 'eye' : 'eye-off'} size={24} color="black" />
+        <TouchableOpacity style={styles.signUpButton} onPress={handleSignUp}>
+          <Text style={styles.signUpButtonText}>Sign Up</Text>
         </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.signUpButton} onPress={handleSignUp}>
-        <Text style={styles.signUpButtonText}>Sign Up</Text>
-      </TouchableOpacity>
       <View style={styles.registerContainer}>
-        <Text>Already have an account? </Text>
+        <Text style={styles.text}>Already have an account? </Text>
         <TouchableOpacity onPress={() => router.push('/(auth)/Login')}>
           <Text style={styles.registerText}>Login</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
     paddingHorizontal: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
+    color: '#333',
     textAlign: 'center',
-    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  form: {
+    flex: 2,
+    justifyContent: 'center',
   },
   input: {
     height: 50,
-    borderColor: '#ccc',
+    width: 400,
+    borderColor: '#ddd',
     borderWidth: 1,
     borderRadius: 10,
-    paddingHorizontal: 10,
-    marginBottom: 10,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    backgroundColor: '#fff',
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
   eyeIcon: {
     position: 'absolute',
-    right: 10,
+    right: 15,
   },
   signUpButton: {
-    backgroundColor: 'black',
+    backgroundColor: '#000',
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',
@@ -120,14 +153,19 @@ const styles = StyleSheet.create({
   signUpButtonText: {
     color: 'white',
     fontSize: 18,
+    fontWeight: 'bold',
   },
   registerContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: 20,
   },
+  text: {
+    color: '#666',
+  },
   registerText: {
-    color: 'blue',
+    color: '#007AFF',
+    fontWeight: 'bold',
   },
 });
 

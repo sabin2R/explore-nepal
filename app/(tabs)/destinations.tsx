@@ -1,41 +1,70 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet,TextInput, FlatList, Pressable, ImageBackground, ActivityIndicator, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  FlatList,
+  Pressable,
+  ImageBackground,
+  ActivityIndicator,
+  Dimensions,
+  Platform,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { firestore } from '../../config/firebaseConfig';
 import { Destination } from '../../navigation/types';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const {width} =Dimensions.get ('window');
+const { width } = Dimensions.get('window');
 
 const DestinationsScreen: React.FC = () => {
   const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [filteredDestinations, setFilteredDestinations] = useState<Destination[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
 
   useEffect(() => {
     const fetchDestinations = async () => {
       try {
         const snapshot = await firestore.collection('destinations').get();
-        const data = snapshot.docs.map(doc => ({
+        const data = snapshot.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
         })) as Destination[];
         setDestinations(data);
+        setFilteredDestinations(data); // Initially show all destinations
       } catch (error) {
         console.error('Error fetching destinations:', error);
       } finally {
         setLoading(false);
       }
     };
+
     fetchDestinations();
   }, []);
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim() === '') {
+      setFilteredDestinations(destinations);
+    } else {
+      const filteredData = destinations.filter((destination) =>
+        destination.name.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredDestinations(filteredData);
+    }
+  };
 
   const renderItem = ({ item }: { item: Destination }) => (
     <Pressable onPress={() => router.push(`/destinationDetail?destination=${encodeURIComponent(JSON.stringify(item))}`)}>
       <View style={styles.destinationCard}>
-        <ImageBackground source={{ uri: item.imageUrl }} style={styles.destinationImage} />
-        <View style={styles.destinationTextContainer}>
-          <Text style={styles.destinationName}>{item.name}</Text>
-        </View>
+        <ImageBackground source={{ uri: item.imageUrl }} style={styles.destinationImage}>
+          <View style={styles.destinationTextContainer}>
+            <Text style={styles.destinationName}>{item.name}</Text>
+          </View>
+        </ImageBackground>
       </View>
     </Pressable>
   );
@@ -43,29 +72,35 @@ const DestinationsScreen: React.FC = () => {
   const ListHeaderComponent = () => (
     <>
       <TextInput
-        style={styles.searchBar}
+        style={[
+          styles.searchBar,
+          Platform.OS === 'ios' ? styles.searchBarIOS : styles.searchBarAndroid,
+        ]}
         placeholder="Search your destination"
+        placeholderTextColor="#888"
+        value={searchQuery}
+        onChangeText={handleSearch}
       />
       <Text style={styles.sectionTitle}>Destinations</Text>
     </>
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {loading ? (
         <ActivityIndicator size="large" color="#0000ff" />
       ) : (
         <FlatList
-          data={destinations}
+          data={filteredDestinations}
           renderItem={renderItem}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           ListHeaderComponent={ListHeaderComponent}
-          numColumns={width > 600? 3:2}
-          columnWrapperStyle ={styles.columnWrapper}
+          numColumns={width > 600 ? 3 : 2}
+          columnWrapperStyle={styles.columnWrapper}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -73,11 +108,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+    backgroundColor: '#f9f9f9',
   },
   list: {
     paddingBottom: 20,
   },
-
   searchBar: {
     marginHorizontal: 20,
     padding: 10,
@@ -85,15 +120,19 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginBottom: 20,
   },
-
+  searchBarIOS: {
+    // Specific styles for iOS
+  },
+  searchBarAndroid: {
+    // Specific styles for Android
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
   },
-
   destinationCard: {
-    flex:1,
+    flex: 1,
     backgroundColor: '#fff',
     padding: 10,
     marginBottom: 10,
@@ -104,26 +143,25 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
     shadowRadius: 2,
-    width: width > 600? 350:200,
+    width: width > 600 ? 350 : 200,
   },
   destinationImage: {
     width: '100%',
     height: width / 3.5,
   },
   destinationName: {
-    fontSize: width > 600 ? 22:15,
+    fontSize: width > 600 ? 22 : 15,
     fontWeight: 'bold',
     marginBottom: 5,
-    color: '#fff'
+    color: '#fff',
   },
   destinationTextContainer: {
-    // fontSize: ,
     padding: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   columnWrapper: {
-    justifyContent: 'space-around'
-  }
+    justifyContent: 'space-around',
+  },
 });
 
 export default DestinationsScreen;
