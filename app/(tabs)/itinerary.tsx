@@ -13,20 +13,24 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { firestore } from '../../config/firebaseConfig';
+import { firestore, auth } from '../../config/firebaseConfig';
 import { Itinerary, Destination } from '../../navigation/types';
 
 const { width } = Dimensions.get('window');
 
 const ItineraryScreen: React.FC = () => {
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
-  const [destinations, setDestinations] = useState<Record<string, Destination>>(
-    {}
-  );
+  const [destinations, setDestinations] = useState<Record<string, Destination>>({});
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const currentUser = auth.currentUser;
 
   useEffect(() => {
+    if (!currentUser) {
+      Alert.alert('Error', 'User not authenticated.');
+      return;
+    }
+
     const fetchDestinations = async () => {
       try {
         const snapshot = await firestore.collection('destinations').get();
@@ -42,11 +46,23 @@ const ItineraryScreen: React.FC = () => {
 
     const fetchItineraries = async () => {
       try {
-        const snapshot = await firestore.collection('itineraries').get();
+        console.log('Fetching itineraries for user ID:', currentUser.uid); // Debugging log
+        const snapshot = await firestore
+          .collection('itineraries')
+          .where('userId', '==', currentUser.uid) // Filter by current user
+          .get();
+
+        if (snapshot.empty) {
+          console.log('No itineraries found for this user.'); // Debugging log
+        } else {
+          console.log('Itineraries fetched successfully.'); // Debugging log
+        }
+
         const data = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         })) as Itinerary[];
+
         setItineraries(data);
       } catch (error) {
         console.error('Error fetching itineraries:', error);
@@ -57,7 +73,7 @@ const ItineraryScreen: React.FC = () => {
 
     fetchDestinations();
     fetchItineraries();
-  }, []);
+  }, [currentUser]);
 
   const handleDeleteItinerary = async (id: string) => {
     Alert.alert(
@@ -136,6 +152,10 @@ const ItineraryScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       {loading ? (
         <ActivityIndicator size="large" color="#0000ff" />
+      ) : itineraries.length === 0 ? ( // Handle case where no itineraries exist
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateText}>No itineraries found. Add one now!</Text>
+        </View>
       ) : (
         <FlatList
           data={itineraries}
@@ -159,6 +179,15 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingHorizontal: 10,
     paddingBottom: 80, // Leave space for the floating button
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: 18,
+    color: '#666',
   },
   itineraryCard: {
     flexDirection: 'row',

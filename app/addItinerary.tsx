@@ -10,11 +10,12 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { firestore } from '../config/firebaseConfig';
+import { auth, firestore } from '../config/firebaseConfig';
 import { useRouter } from 'expo-router';
 import { Destination, Itinerary } from '../navigation/types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 
 const { width } = Dimensions.get('window');
 
@@ -58,7 +59,13 @@ const AddItineraryScreen: React.FC = () => {
     }
 
     try {
+      const userId = auth.currentUser?.uid;
+      if (!userId){
+        Alert.alert('Error', 'User not authenticated.');
+        return;
+      }
       const itinerary: Itinerary = {
+        userId,
         destinationId: selectedDestination,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
@@ -66,8 +73,38 @@ const AddItineraryScreen: React.FC = () => {
       };
 
       await firestore.collection('itineraries').add(itinerary);
+
+      // Determine the notification trigger time based on how close the trip is
+      let triggerDate = new Date(startDate);
+      const now = new Date();
+
+      if (startDate.getDate() === now.getDate() && startDate.getMonth() === now.getMonth() && startDate.getFullYear() === now.getFullYear()) {
+        // If the trip starts today, notify immediately
+        triggerDate = new Date(now.getTime() + 10000); // Trigger in 10 seconds
+      } else if (startDate.getDate() - now.getDate() === 1) {
+        // If the trip starts tomorrow, notify today
+        triggerDate.setHours(20, 0, 0); // Notify today at 8:00 PM
+      } else {
+        // Notify one day before the trip
+        triggerDate.setDate(triggerDate.getDate() - 1);
+        triggerDate.setHours(9, 0, 0); // Notify at 9:00 AM the day before
+      }
+
+      if (triggerDate <= now) {
+        Alert.alert('Invalid Date', 'The date is in the past.');
+        return;
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Upcoming Trip Reminder",
+          body: `Your trip to ${destinations.find(d => d.id === selectedDestination)?.name} is coming up soon!`,
+        },
+        trigger: { date: triggerDate },
+      });
+
       Alert.alert('Itinerary added successfully!');
-      router.push('/itinerary'); // Navigate back to itinerary list
+      router.push('/itinerary'); // Navigate back to the itinerary list
     } catch (error) {
       Alert.alert('Error adding itinerary:', error.message);
     }
@@ -86,7 +123,7 @@ const AddItineraryScreen: React.FC = () => {
       <Picker
         selectedValue={selectedDestination}
         onValueChange={(itemValue) => setSelectedDestination(itemValue)}
-        style={[styles.picker, {height: Platform.OS === 'ios' ?200 :50}]}
+        style={styles.picker}
       >
         <Picker.Item label="Select a destination" value={null} />
         {destinations.map((destination) => (
@@ -158,8 +195,11 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   picker: {
-    height: 20,
     marginBottom: 20,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    padding: 5,
   },
   dateButton: {
     fontSize: 16,
@@ -169,17 +209,18 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#e0e0e0',
     marginBottom: 20,
+    textAlign: 'center',
   },
   addButton: {
     backgroundColor: '#007AFF',
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 10,
     alignItems: 'center',
     marginTop: 20,
   },
   addButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
 });

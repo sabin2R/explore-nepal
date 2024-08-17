@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -19,6 +20,7 @@ import globalStyles from '../../styles/globalStyles';
 import { Destination } from '../../navigation/types';
 import firebase from 'firebase/compat/app';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 
 const { width } = Dimensions.get('window');
 
@@ -30,6 +32,7 @@ const HomeScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [notificationCount, setNotificationCount] = useState(0); // New state for notification count
   const router = useRouter();
 
   useEffect(() => {
@@ -55,10 +58,10 @@ const HomeScreen: React.FC = () => {
           id: doc.id,
           ...doc.data(),
         })) as Destination[];
-        
+
         const shuffled = data.sort(() => 0.5 - Math.random());
         const selectedDestinations = shuffled.slice(0, 5);
-        setAllDestinations(data);  // Store all destinations
+        setAllDestinations(data); // Store all destinations
         setInitialDestinations(selectedDestinations); // Store only the 5 randomly selected ones
         setFilteredDestinations(selectedDestinations); // Initially show the 5 selected destinations
       } catch (error) {
@@ -68,8 +71,24 @@ const HomeScreen: React.FC = () => {
       }
     };
 
+    const fetchNotificationCount = async () => {
+      try {
+        const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+        setNotificationCount(scheduledNotifications.length);
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      }
+    };
+
     fetchUserName();
     fetchInitialDestinations();
+    fetchNotificationCount();
+
+    const subscription = Notifications.addNotificationReceivedListener(() => {
+      fetchNotificationCount(); // Update count when a notification is received
+    });
+
+    return () => subscription.remove(); // Cleanup
   }, []);
 
   const fetchFilteredDestinations = (query: string, category: string | null) => {
@@ -103,6 +122,10 @@ const HomeScreen: React.FC = () => {
     fetchFilteredDestinations(query, selectedCategory);
   };
 
+  const handleNotificationPress = () => {
+    router.push('/notifications'); // Navigate to the notifications screen
+  };
+
   const renderItem = ({ item }: { item: Destination }) => (
     <Pressable onPress={() => router.push(`/destinationDetail?destination=${encodeURIComponent(JSON.stringify(item))}`)}>
       <View style={styles.destinationCard}>
@@ -119,7 +142,14 @@ const HomeScreen: React.FC = () => {
     <>
       <View style={styles.header}>
         <Text style={styles.greeting}>Hi {userName}!</Text>
-        <Ionicons name="notifications-outline" size={24} color="black" style={styles.notificationIcon} />
+        <Pressable onPress={handleNotificationPress} style={styles.notificationIconContainer}>
+          <Ionicons name="notifications-outline" size={24} color="black" style={styles.notificationIcon} />
+          {notificationCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{notificationCount}</Text>
+            </View>
+          )}
+        </Pressable>
       </View>
       <TextInput
         style={styles.searchBar}
@@ -192,8 +222,25 @@ const styles = StyleSheet.create({
     fontSize: width > 600 ? 30 : 24,
     fontWeight: 'bold',
   },
+  notificationIconContainer: {
+    position: 'relative',
+  },
   notificationIcon: {
     marginRight: 10,
+  },
+  badge: {
+    position: 'absolute',
+    right: -5,
+    top: -5,
+    backgroundColor: 'red',
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   searchBar: {
     marginHorizontal: 20,
