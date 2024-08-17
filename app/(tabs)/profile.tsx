@@ -43,7 +43,7 @@ const ProfileScreen: React.FC = () => {
         <Text style={styles.userEmail}>{userEmail}</Text>
       </View>
       <View style={styles.settingsContainer}>
-        <TouchableOpacity style={styles.settingItem}>
+        <TouchableOpacity style={styles.settingItem} onPress={()=> router.push('/notifications')}>
           <Ionicons name="notifications-outline" size={24} color="black" />
           <Text style={styles.settingText}>Notifications</Text>
         </TouchableOpacity>

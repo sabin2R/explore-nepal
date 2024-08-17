@@ -9,6 +9,8 @@ import {
   Alert,
   Image,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
@@ -26,7 +28,6 @@ const ItineraryDetailScreen: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Extract the itineraryId from the URL
   const itineraryId = pathname.split('/').pop();
 
   useEffect(() => {
@@ -38,13 +39,11 @@ const ItineraryDetailScreen: React.FC = () => {
       }
 
       try {
-        // Fetch the itinerary document
         const itineraryDoc = await firestore.collection('itineraries').doc(itineraryId).get();
         if (itineraryDoc.exists) {
           const itineraryData = itineraryDoc.data() as Itinerary;
           setActivities(itineraryData.activities || []);
 
-          // Fetch the destination details using the destinationId from itinerary
           const destinationDoc = await firestore
             .collection('destinations')
             .doc(itineraryData.destinationId)
@@ -52,7 +51,6 @@ const ItineraryDetailScreen: React.FC = () => {
           if (destinationDoc.exists) {
             setDestination(destinationDoc.data() as Destination);
           } else {
-            console.warn(`Destination not found with ID: ${itineraryData.destinationId}`);
             Alert.alert('Destination not found');
             router.push('/itinerary');
             return;
@@ -63,7 +61,6 @@ const ItineraryDetailScreen: React.FC = () => {
           return;
         }
       } catch (error) {
-        console.error('Error fetching itinerary details:', error);
         Alert.alert('Error fetching itinerary details:', error.message);
       }
     };
@@ -92,7 +89,6 @@ const ItineraryDetailScreen: React.FC = () => {
       setNewActivityDescription('');
       Alert.alert('Activity added successfully!');
     } catch (error) {
-      console.error('Error adding activity:', error);
       Alert.alert('Error adding activity:', error.message);
     }
   };
@@ -105,10 +101,19 @@ const ItineraryDetailScreen: React.FC = () => {
       });
       setActivities(updatedActivities);
     } catch (error) {
-      console.error('Error deleting activity:', error);
       Alert.alert('Error deleting activity:', error.message);
     }
   };
+
+  const renderItem = ({ item, index }: { item: Activity; index: number }) => (
+    <View style={styles.activityCard} key={index}>
+      <Text style={styles.activityTime}>{item.time}</Text>
+      <Text style={styles.activityDescription}>{item.description}</Text>
+      <TouchableOpacity onPress={() => handleDeleteActivity(index)} style={styles.deleteButton}>
+        <Ionicons name="trash" size={20} color="#ff0000" />
+      </TouchableOpacity>
+    </View>
+  );
 
   if (!destination) {
     return (
@@ -118,52 +123,48 @@ const ItineraryDetailScreen: React.FC = () => {
     );
   }
 
-  const renderItem = ({ item, index }: { item: Activity; index: number }) => (
-    <View style={styles.activityCard}>
-      <Text style={styles.activityTime}>{item.time}</Text>
-      <Text style={styles.activityDescription}>{item.description}</Text>
-      <TouchableOpacity onPress={() => handleDeleteActivity(index)} style={styles.deleteButton}>
-        <Ionicons name="trash" size={20} color="#ff0000" />
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="black" />
-        </TouchableOpacity>
-        <Text style={styles.title}>{destination.name}</Text>
-      </View>
-      <Image source={{ uri: destination.imageUrl }} style={styles.image} />
-      <Text style={styles.header}>Schedule</Text>
-      <FlatList
-        data={activities}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => index.toString()}
-        contentContainerStyle={styles.contentContainer}
-      />
-      <View style={styles.addActivityContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter time (e.g., 8:00 AM)"
-          placeholderTextColor="#888" 
-          value={newActivityTime}
-          onChangeText={setNewActivityTime}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="black" />
+          </TouchableOpacity>
+          <Text style={styles.title}>{destination.name}</Text>
+        </View>
+        <Image source={{ uri: destination.imageUrl }} style={styles.image} />
+        <Text style={styles.header}>Schedule</Text>
+        <FlatList
+          data={activities}
+          renderItem={renderItem}
+          keyExtractor={(_, index) => index.toString()}
+          contentContainerStyle={styles.contentContainer}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Enter activity description"
-          placeholderTextColor="#888" 
-          value={newActivityDescription}
-          onChangeText={setNewActivityDescription}
-        />
-        <TouchableOpacity style={styles.addButton} onPress={handleAddActivity}>
-          <Text style={styles.addButtonText}>Add Activity</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+        {/* Input form at the bottom */}
+        <View style={styles.addActivityContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter time (e.g., 8:00 AM)"
+            placeholderTextColor="#888"
+            value={newActivityTime}
+            onChangeText={setNewActivityTime}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter activity description"
+            placeholderTextColor="#888"
+            value={newActivityDescription}
+            onChangeText={setNewActivityDescription}
+          />
+          <TouchableOpacity style={styles.addButton} onPress={handleAddActivity}>
+            <Text style={styles.addButtonText}>Add Activity</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -207,10 +208,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#fff',
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
   },
   activityTime: {
     fontSize: 16,
@@ -228,8 +225,8 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   addActivityContainer: {
-    marginTop: 20,
-    paddingVertical: 10,
+    padding: 20,
+    backgroundColor: '#f9f9f9',
     borderTopWidth: 1,
     borderColor: '#ddd',
   },

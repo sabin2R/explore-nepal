@@ -31,6 +31,7 @@ export interface Activity{
 
 export interface Itinerary {
   id?: string;
+  userId: string;
   destinationId: string; // Reference to a destination
   startDate: string; // ISO string format
   endDate: string; // ISO string format

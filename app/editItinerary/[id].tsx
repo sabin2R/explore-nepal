@@ -7,30 +7,38 @@ import {
   Alert,
   Platform,
   TouchableOpacity,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { firestore } from '../../config/firebaseConfig';
+import { firestore, auth } from '../../config/firebaseConfig';
 import { Itinerary, Destination } from '../../navigation/types';
+import { useLocalSearchParams } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 
 const EditItineraryScreen: React.FC = () => {
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
-  const [selectedDestination, setSelectedDestination] = useState<string | null>(
-    null
-  );
+  const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [endDate, setEndDate] = useState<Date>(new Date());
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [datePickerMode, setDatePickerMode] = useState<'start' | 'end' | null>(null);
   const router = useRouter();
   const pathname = usePathname();
-  const itineraryId = pathname.split('/').pop(); // Extract itinerary ID from URL
+  const { id } = useLocalSearchParams();
+  const itineraryId = Array.isArray(id) ? id[0] : id ?? pathname.split('/').pop();
 
   useEffect(() => {
+    if (!itineraryId || itineraryId === '[id]') {
+      Alert.alert('Invalid Itinerary ID');
+      router.push('/itinerary');
+      return;
+    }
+
     const fetchDestinations = async () => {
       try {
         const snapshot = await firestore.collection('destinations').get();
@@ -59,6 +67,7 @@ const EditItineraryScreen: React.FC = () => {
         }
       } catch (error) {
         console.error('Error fetching itinerary:', error);
+        Alert.alert('Error fetching itinerary:', error.message);
       }
     };
 
@@ -78,17 +87,72 @@ const EditItineraryScreen: React.FC = () => {
     }
 
     try {
-      await firestore.collection('itineraries').doc(itineraryId).update({
+      const itineraryRef = firestore.collection('itineraries').doc(itineraryId);
+      const doc = await itineraryRef.get();
+      if (!doc.exists) {
+        throw new Error('Itinerary not found.');
+      }
+
+      const existingItinerary = doc.data() as Itinerary;
+      const shouldResetActivities =
+        existingItinerary.destinationId !== selectedDestination;
+
+      const updatedItinerary: Partial<Itinerary> = {
         destinationId: selectedDestination,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
+        activities: shouldResetActivities ? [] : existingItinerary.activities,
+        userId: auth.currentUser?.uid || '', // Add userId here
+      };
+
+      await itineraryRef.update(updatedItinerary);
+
+      // Adjust the notification trigger logic based on how close the trip is
+      let triggerDate = new Date(startDate);
+      const now = new Date();
+
+      if (startDate.getDate() === now.getDate() && startDate.getMonth() === now.getMonth() && startDate.getFullYear() === now.getFullYear()) {
+        triggerDate = new Date(now.getTime() + 10000); // Trigger in 10 seconds
+      } else if (startDate.getDate() - now.getDate() === 1) {
+        triggerDate.setHours(20, 0, 0); // Notify today at 8:00 PM
+      } else {
+        triggerDate.setDate(triggerDate.getDate() - 1);
+        triggerDate.setHours(9, 0, 0); // Notify at 9:00 AM the day before
+      }
+
+      if (triggerDate <= now) {
+        Alert.alert('Invalid Notification Date', 'The notification date is in the past or too close.');
+        return;
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Upcoming Trip Reminder",
+          body: `Your trip to ${destinations.find(d => d.id === selectedDestination)?.name} starts tomorrow!`,
+          data: { itineraryId },
+        },
+        trigger: { date: triggerDate },
       });
 
-      Alert.alert('Itinerary updated successfully!');
-      router.push('/itinerary'); // Navigate back to itinerary list
+      Alert.alert('Itinerary updated!');
+      router.push('/itinerary'); // Navigate back to the itinerary list
     } catch (error) {
       Alert.alert('Error updating itinerary:', error.message);
+      console.error('Error updating itinerary:', error);
     }
+  };
+
+  const showDatePicker = (mode: 'start' | 'end') => {
+    setDatePickerMode(mode);
+  };
+
+  const onDateChange = (event: any, selectedDate: Date | undefined) => {
+    if (datePickerMode === 'start' && selectedDate) {
+      setStartDate(selectedDate);
+    } else if (datePickerMode === 'end' && selectedDate) {
+      setEndDate(selectedDate);
+    }
+    setDatePickerMode(null);
   };
 
   if (!itinerary) {
@@ -100,68 +164,71 @@ const EditItineraryScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="black" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Edit Itinerary</Text>
-      </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={24} color="black" />
+            </TouchableOpacity>
+            <Text style={styles.title}>Edit Itinerary</Text>
+          </View>
 
-      <Text style={styles.label}>Select Destination:</Text>
-      <Picker
-        selectedValue={selectedDestination}
-        onValueChange={(itemValue) => setSelectedDestination(itemValue)}
-        style={[styles.picker, { height: Platform.OS === 'ios' ? 200 : 50 }]}
-      >
-        <Picker.Item label="Select a destination" value={null} />
-        {destinations.map((destination) => (
-          <Picker.Item
-            key={destination.id}
-            label={destination.name}
-            value={destination.id}
+          <Text style={styles.label}>Select Destination:</Text>
+          <Picker
+            selectedValue={selectedDestination}
+            onValueChange={(itemValue) => setSelectedDestination(itemValue)}
+            style={[styles.picker, { height: Platform.OS === 'ios' ? 200 : 50 }]}
+          >
+            <Picker.Item label="Select a destination" value={null} />
+            {destinations.map((destination) => (
+              <Picker.Item
+                key={destination.id}
+                label={destination.name}
+                value={destination.id}
+              />
+            ))}
+          </Picker>
+
+          <Text style={styles.label}>Start Date:</Text>
+          <Button
+            title={startDate.toDateString()}
+            onPress={() => showDatePicker('start')}
           />
-        ))}
-      </Picker>
+          {datePickerMode === 'start' && (
+            <DateTimePicker
+              value={startDate}
+              mode="date"
+              display="default"
+              onChange={onDateChange}
+            />
+          )}
 
-      <Text style={styles.label}>Start Date:</Text>
-      <Button
-        title={startDate.toDateString()}
-        onPress={() => setShowStartDatePicker(true)}
-      />
-      {showStartDatePicker && (
-        <DateTimePicker
-          value={startDate}
-          mode="date"
-          display="default"
-          onChange={(event, date) => {
-            setShowStartDatePicker(false);
-            if (date) setStartDate(date);
-          }}
-        />
-      )}
+          <Text style={styles.label}>End Date:</Text>
+          <Button
+            title={endDate.toDateString()}
+            onPress={() => showDatePicker('end')}
+          />
+          {datePickerMode === 'end' && (
+            <DateTimePicker
+              value={endDate}
+              mode="date"
+              display="default"
+              onChange={onDateChange}
+            />
+          )}
 
-      <Text style={styles.label}>End Date:</Text>
-      <Button
-        title={endDate.toDateString()}
-        onPress={() => setShowEndDatePicker(true)}
-      />
-      {showEndDatePicker && (
-        <DateTimePicker
-          value={endDate}
-          mode="date"
-          display="default"
-          onChange={(event, date) => {
-            setShowEndDatePicker(false);
-            if (date) setEndDate(date);
-          }}
-        />
-      )}
-
-      <View style={styles.buttonContainer}>
-        <Button title="Update Itinerary" onPress={handleUpdateItinerary} />
-      </View>
-    </SafeAreaView>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.updateButton} onPress={handleUpdateItinerary}>
+              <Text style={styles.updateButtonText}>Update Itinerary</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -197,6 +264,17 @@ const styles = StyleSheet.create({
   buttonContainer: {
     marginTop: 20,
     alignItems: 'center',
+  },
+  updateButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+  },
+  updateButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 
